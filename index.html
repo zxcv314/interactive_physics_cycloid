@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Cycloid Grand Lab</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;600&display=swap">
+  <style>
+    body { font-family: 'SF Pro Display', -apple-system, sans-serif; transition: background-color 0.5s ease, color 0.5s ease; overflow: hidden; overscroll-behavior: none; }
+    canvas { touch-action: none; }
+    
+    #main-container { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+    .section-page { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: transform 0.8s cubic-bezier(0.65, 0, 0.35, 1), opacity 0.6s ease; opacity: 0; pointer-events: none; }
+    .section-active { transform: translateY(0); opacity: 1; pointer-events: auto; z-index: 10; }
+    .section-prev { transform: translateY(-100%); opacity: 0.5; }
+    .section-next { transform: translateY(100%); opacity: 0; }
+    
+    .glass-card { backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); border-radius: 28px; transition: all 0.4s; }
+    body.dark .glass-card { background: rgba(28, 28, 30, 0.65); border: 1px solid rgba(255, 255, 255, 0.08); }
+    body.light .glass-card { background: rgba(255, 255, 255, 0.7); border: 1px solid rgba(0, 0, 0, 0.06); box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+
+    #theme-toggle { position: fixed; right: 24px; bottom: 24px; width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(10px); cursor: pointer; transition: all 0.3s; z-index: 100; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+    body.dark #theme-toggle { background: rgba(44, 44, 46, 0.9); color: #fbbf24; border: 1px solid rgba(255, 255, 255, 0.1); }
+    body.light #theme-toggle { background: rgba(255, 255, 255, 0.9); color: #8b5cf6; border: 1px solid rgba(0, 0, 0, 0.08); }
+    #theme-toggle:hover { transform: scale(1.1) rotate(15deg); }
+
+    .particle { position: absolute; border-radius: 50%; pointer-events: none; mix-blend-mode: screen; animation: fadeOut 0.8s ease forwards; }
+    @keyframes fadeOut { 0% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(3); } }
+
+    /* Custom Slider Styling */
+    input[type=range] { -webkit-appearance: none; background: transparent; }
+    input[type=range]:focus { outline: none; }
+    input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: rgba(120, 120, 128, 0.2); border-radius: 2px; }
+    input[type=range]::-webkit-slider-thumb { height: 18px; width: 18px; border-radius: 50%; background: #fff; cursor: pointer; -webkit-appearance: none; margin-top: -7px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+  </style>
+</head>
+<body class="dark bg-[#000] text-white">
+
+  <header class="fixed top-0 left-0 w-full flex justify-between items-center p-8 z-50">
+    <div class="flex flex-col">
+      <h1 class="text-xl font-bold tracking-tight">Cycloid<span class="text-blue-500">Lab</span></h1>
+      <span class="text-[10px] font-mono opacity-40 uppercase tracking-[0.2em]">Interactive Physics</span>
+    </div>
+    <nav class="flex gap-3 glass-card px-3 py-2">
+      <button onclick="jumpToPage(1)" id="nav-1" class="w-2 h-2 rounded-full bg-blue-500 transition-all scale-125"></button>
+      <button onclick="jumpToPage(2)" id="nav-2" class="w-2 h-2 rounded-full bg-white/20 transition-all hover:bg-white/40"></button>
+      <button onclick="jumpToPage(3)" id="nav-3" class="w-2 h-2 rounded-full bg-white/20 transition-all hover:bg-white/40"></button>
+      <button onclick="jumpToPage(4)" id="nav-4" class="w-2 h-2 rounded-full bg-white/20 transition-all hover:bg-white/40"></button>
+    </nav>
+  </header>
+
+  <div id="theme-toggle" onclick="toggleTheme()">
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" id="theme-icon"><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+  </div>
+
+  <div id="main-container">
+    
+    <section id="page-1" class="section-page section-active">
+      <div class="text-center mb-10">
+        <h2 class="text-4xl font-semibold tracking-tight mb-3">사이클로이드 _ Cycloid</h2>
+        <p class="text-sm text-gray-500 font-light">원이 구를 때 원 위의 한 점이 그리는 자취.</p>
+      </div>
+      <div class="glass-card relative w-full max-w-[840px] aspect-[840/420] overflow-hidden" id="genesis-container">
+        <canvas id="canvas-genesis" width="840" height="420" class="block w-full h-full"></canvas>
+      </div>
+      <p class="mt-8 text-[11px] font-mono opacity-30 animate-pulse">SCROLL TO ROTATE</p> section-active
+    </section>
+
+    <section id="page-2" class="section-page section-next">
+      <div class="text-center mb-8">
+        <h2 class="text-3xl font-semibold mb-2 text-emerald-400">최속강하곡선</h2>
+        <p class="text-sm text-gray-500">가장 빠르게 도달하는 경로를 그려보세요.</p>
+      </div>
+      <div class="glass-card relative w-full max-w-[840px] aspect-[840/400]">
+        <canvas id="canvas-brach" width="840" height="400" class="block w-full h-full cursor-crosshair"></canvas>
+        <div id="brach-guide" class="absolute inset-0 flex items-center justify-center pointer-events-none transition-opacity duration-500">
+          <p class="text-xs bg-white/5 backdrop-blur-md px-6 py-3 rounded-full border border-white/10 tracking-wide">두 점 사이를 드래그하여 곡선을 그려보세요</p>
+        </div>
+      </div>
+      <div class="w-full max-w-[840px] mt-8 flex justify-between items-center px-6">
+        <div class="font-mono text-xs space-x-6">
+          <span class="text-emerald-400 font-bold uppercase tracking-wider">User: <span id="time-user">0.000s</span></span>
+          <span class="text-red-400 font-bold uppercase tracking-wider">Theory: <span id="time-cycloid">0.000s</span></span>
+        </div>
+        <div class="flex items-center gap-4">
+          <span id="trial-counter" class="text-[10px] font-mono opacity-40 uppercase">3 trials left</span>
+          <button id="btn-brach" onclick="toggleBrach()" class="px-8 py-3 rounded-full bg-white text-black font-bold text-xs hover:scale-105 active:scale-95 transition-all shadow-lg">공 굴리기</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="page-3" class="section-page section-next">
+      <div class="text-center mb-8">
+        <h2 class="text-3xl font-semibold mb-2 text-purple-400">등시성</h2>
+        <p class="text-sm text-gray-500">높이에 상관없이 동시에 도착합니다.</p>
+      </div>
+      <div class="glass-card relative w-full max-w-[840px] aspect-[840/400]">
+        <canvas id="canvas-tauto" width="840" height="400" class="block w-full h-full cursor-pointer"></canvas>
+      </div>
+      <div class="w-full max-w-[840px] mt-8 flex justify-center gap-4">
+        <button onclick="clearTautoBalls()" class="px-8 py-3 rounded-full bg-white/10 font-bold text-xs hover:bg-white/20 transition-all">초기화</button>
+        <button id="btn-tauto" onclick="toggleTauto()" class="px-10 py-3 rounded-full bg-purple-600 text-white font-bold text-xs hover:bg-purple-500 transition-all shadow-[0_10px_30px_rgba(168,85,247,0.3)]">실험 시작</button>
+      </div>
+    </section>
+
+    <section id="page-4" class="section-page section-next">
+      <div class="text-center mb-6 z-10">
+        <h2 class="text-4xl font-bold mb-2 tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400">Art of Math</h2>
+        <p class="text-sm text-gray-500">변수 조절을 통해 실시간으로 변하는 곡선을 감상하세요.</p>
+      </div>
+      
+      <div class="absolute inset-0 z-0 opacity-80">
+        <canvas id="canvas-spiro" width="1000" height="600" class="block w-full h-full"></canvas>
+      </div>
+
+      <div class="glass-card fixed bottom-10 right-10 p-8 flex flex-col gap-6 z-20 w-[320px] shadow-2xl">
+        <div class="space-y-4">
+          <div class="flex items-center justify-between text-[10px] font-mono tracking-widest text-gray-400 uppercase">
+            <span>Outer Radius (R)</span>
+            <span id="val-spiro-R" class="text-blue-400 font-bold">150</span>
+          </div>
+          <input type="range" id="spiro-R" min="50" max="250" step="1" value="150" class="w-full">
+
+          <div class="flex items-center justify-between text-[10px] font-mono tracking-widest text-gray-400 uppercase">
+            <span>Inner Radius (r)</span>
+            <span id="val-spiro-r" class="text-purple-400 font-bold">65</span>
+          </div>
+          <input type="range" id="spiro-r" min="5" max="140" step="1" value="65" class="w-full">
+
+          <div class="flex items-center justify-between text-[10px] font-mono tracking-widest text-gray-400 uppercase">
+            <span>Pen Offset (d)</span>
+            <span id="val-spiro-d" class="text-pink-400 font-bold">85</span>
+          </div>
+          <input type="range" id="spiro-d" min="10" max="200" step="1" value="85" class="w-full">
+        </div>
+        <button onclick="resetSpiro()" class="text-[10px] font-bold uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity">Reset Art</button>
+      </div>
+    </section>
+
+  </div>
+
+  <script>
+    // --- Global State ---
+    let currentPage = 1;
+    let isScrolling = false;
+    let trialCountBrach = 0;
+    let isDarkMode = true;
+
+    // --- Theme Control ---
+    function toggleTheme() {
+      isDarkMode = !isDarkMode;
+      const body = document.body;
+      const icon = document.getElementById('theme-icon');
+      
+      if(isDarkMode) {
+        body.className = 'dark bg-[#000] text-white';
+        icon.innerHTML = '<path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>';
+      } else {
+        body.className = 'light bg-[#F5F5F7] text-[#1d1d1f]';
+        icon.innerHTML = '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>';
+      }
+      
+      // Force immediate redraws
+      drawGenesis(); drawBrach(); drawTauto(); drawSpiro();
+    }
+
+    // --- Navigation Control ---
+    function jumpToPage(page) {
+      if(isScrolling || page === currentPage) return;
+      isScrolling = true;
+      
+      const oldPage = document.getElementById(`page-${currentPage}`);
+      const newPage = document.getElementById(`page-${page}`);
+      
+      if (page > currentPage) {
+        oldPage.className = 'section-page section-prev';
+        newPage.className = 'section-page section-active';
+      } else {
+        oldPage.className = 'section-page section-next';
+        newPage.className = 'section-page section-active';
+      }
+
+      document.querySelectorAll('nav button').forEach((btn, idx) => {
+        btn.className = (idx + 1 === page) 
+          ? `w-2 h-2 rounded-full transition-all bg-blue-500 scale-125`
+          : "w-2 h-2 rounded-full bg-white/20 transition-all hover:bg-white/40";
+      });
+
+      currentPage = page;
+      setTimeout(() => { isScrolling = false; }, 800);
+    }
+
+    window.addEventListener('wheel', (e) => {
+      if(isScrolling) return;
+      if(currentPage === 1) {
+        if(e.deltaY > 0) genesisTheta += 0.12;
+        else genesisTheta -= 0.12;
+        genesisTheta = Math.max(0, Math.min(Math.PI * 2.05, genesisTheta));
+        drawGenesis();
+        if(genesisTheta >= Math.PI * 2 && e.deltaY > 50) jumpToPage(2);
+      } else {
+        if(e.deltaY > 50 && currentPage < 4) jumpToPage(currentPage + 1);
+        if(e.deltaY < -50 && currentPage > 1) jumpToPage(currentPage - 1);
+      }
+    }, { passive: true });
+
+
+    // --- PAGE 1: GENESIS (Ceiling Cycloid) ---
+    const c1 = document.getElementById('canvas-genesis');
+    const ctx1 = c1.getContext('2d');
+    let genesisTheta = 0;
+    const gR = 65, gStartY = 80, gStartX = 120;
+
+    function spawnParticle(x, y) {
+      const p = document.createElement('div');
+      p.className = 'particle bg-blue-500';
+      const size = Math.random() * 8 + 2;
+      p.style.width = size + 'px'; p.style.height = size + 'px'; 
+      p.style.left = x + 'px'; p.style.top = y + 'px';
+      document.getElementById('genesis-container').appendChild(p);
+      setTimeout(() => p.remove(), 800);
+    }
+
+    function drawGenesis() {
+      ctx1.clearRect(0, 0, 840, 420);
+      const mainCol = isDarkMode ? '#fff' : '#1d1d1f';
+      const accentCol = '#3b82f6';
+      const railCol = isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
+
+      ctx1.strokeStyle = railCol; ctx1.lineWidth = 2;
+      ctx1.beginPath(); ctx1.moveTo(0, gStartY); ctx1.lineTo(840, gStartY); ctx1.stroke();
+
+      // Math Formula
+      ctx1.font = '500 14px SF Pro Display'; ctx1.fillStyle = isDarkMode ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)';
+      ctx1.fillText('x = r(θ - sinθ)', 30, 30); ctx1.fillText('y = r(1 - cosθ)', 30, 50);
+
+      // Curve Trace
+      ctx1.beginPath();
+      for(let t=0; t<=genesisTheta; t+=0.02) {
+        let x = gStartX + gR * (t - Math.sin(t)); let y = gStartY + gR * (1 - Math.cos(t));
+        if(t===0) ctx1.moveTo(x,y); else ctx1.lineTo(x,y);
+      }
+      ctx1.strokeStyle = accentCol; ctx1.lineWidth = 6; ctx1.lineCap = 'round'; ctx1.stroke();
+
+      // Rolling Circle
+      let cx = gStartX + gR * genesisTheta, cy = gStartY + gR;
+      ctx1.beginPath(); ctx1.arc(cx, cy, gR, 0, Math.PI*2); ctx1.strokeStyle = mainCol; ctx1.lineWidth = 1.5; ctx1.stroke();
+
+      // Point P
+      let px = cx - gR * Math.sin(genesisTheta), py = cy - gR * Math.cos(genesisTheta);
+      ctx1.beginPath(); ctx1.moveTo(cx, cy); ctx1.lineTo(px, py); ctx1.strokeStyle = railCol; ctx1.stroke();
+      ctx1.beginPath(); ctx1.arc(px, py, 8, 0, Math.PI*2); ctx1.fillStyle = '#60a5fa'; ctx1.fill();
+      
+      if(genesisTheta > 0 && genesisTheta < Math.PI * 2 && Math.random() > 0.4) spawnParticle(px, py);
+    }
+    drawGenesis();
+
+
+    // --- PAGE 2: BRACHISTOCHRONE ---
+    const c2 = document.getElementById('canvas-brach'); ctx2 = c2.getContext('2d');
+    const B_START = { x: 100, y: 50 }, B_END = { x: 740, y: 350 };
+    let brachIsDrawing = false, userPts = [], brachPath = [], brachPathData = null, bPlaying = false, bUserBall = { s:0,v:0,t:0,done:false }, bCycBall = { s:0,v:0,t:0,done:false }, brachAnim;
+
+    function buildBrachCyc() {
+      let pts = []; for(let t=0; t<=100; t++) { let a = (t/100) * Math.PI * 0.95; pts.push({ x: B_START.x + (B_END.x - B_START.x) * (a - Math.sin(a)) / (Math.PI*0.95 - Math.sin(Math.PI*0.95)), y: B_START.y + (B_END.y - B_START.y) * (1 - Math.cos(a)) / (1 - Math.cos(Math.PI*0.95)) }); }
+      return prepPath(pts);
+    }
+    const bCycData = buildBrachCyc();
+
+    function prepPath(pts) {
+      if(!pts || pts.length < 2) return null;
+      let d = 0, res = [{...pts[0], s:0}];
+      for(let i=1; i<pts.length; i++) { d += Math.hypot(pts[i].x-pts[i-1].x, pts[i].y-pts[i-1].y); res.push({...pts[i], s:d}); }
+      return { pts: res, totS: d };
+    }
+
+    function getPtAtS(data, s) {
+      let pts = data.pts;
+      if(s >= data.totS - 0.5) return { x: B_END.x, y: B_END.y, dy: 0 };
+      if(s <= 0) return { x: pts[0].x, y: pts[0].y, dy: Math.max(0.1, (pts[1].y-pts[0].y)/(pts[1].s-pts[0].s)) };
+      for(let i=0; i<pts.length-1; i++) { if(s >= pts[i].s && s <= pts[i+1].s) { let r = (s - pts[i].s) / (pts[i+1].s - pts[i].s); return { x: pts[i].x + (pts[i+1].x-pts[i].x)*r, y: pts[i].y + (pts[i+1].y-pts[i].y)*r, dy: (pts[i+1].y-pts[i].y)/(pts[i+1].s-pts[i].s) }; } }
+      return { x: B_END.x, y: B_END.y, dy: 0 };
+    }
+
+    function drawBrach() {
+      ctx2.clearRect(0,0,840,400);
+      const guideCol = isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)';
+      const nodeCol = isDarkMode ? '#3b82f6' : '#2563eb';
+
+      ctx2.fillStyle = nodeCol; ctx2.beginPath(); ctx2.arc(B_START.x, B_START.y, 10, 0, Math.PI*2); ctx2.fill(); ctx2.beginPath(); ctx2.arc(B_END.x, B_END.y, 10, 0, Math.PI*2); ctx2.fill();
+
+      ctx2.beginPath(); bCycData.pts.forEach((p,i) => i===0 ? ctx2.moveTo(p.x,p.y) : ctx2.lineTo(p.x,p.y)); ctx2.strokeStyle = 'rgba(239, 68, 68, 0.3)'; ctx2.lineWidth = 4; ctx2.stroke();
+
+      let curPts = brachIsDrawing ? userPts : brachPath;
+      if(curPts.length > 0) { ctx2.beginPath(); curPts.forEach((p,i) => i===0 ? ctx2.moveTo(p.x,p.y) : ctx2.lineTo(p.x,p.y)); ctx2.strokeStyle = '#10b981'; ctx2.lineWidth = 6; ctx2.lineCap='round'; ctx2.stroke(); }
+
+      if(bPlaying || bUserBall.s > 0 || bCycBall.s > 0) {
+        let up = bUserBall.done ? B_END : getPtAtS(brachPathData, bUserBall.s), cp = bCycBall.done ? B_END : getPtAtS(bCycData, bCycBall.s);
+        ctx2.beginPath(); ctx2.arc(up.x, up.y, 12, 0, Math.PI*2); ctx2.fillStyle='#10b981'; ctx2.fill(); ctx2.beginPath(); ctx2.arc(cp.x, cp.y, 12, 0, Math.PI*2); ctx2.fillStyle='#ef4444'; ctx2.fill();
+      }
+    }
+    
+    c2.addEventListener('mousedown', e => { if(!bPlaying){ brachIsDrawing=true; userPts=[B_START]; document.getElementById('brach-guide').style.opacity=0; }});
+    c2.addEventListener('mousemove', e => { if(brachIsDrawing){ let r=c2.getBoundingClientRect(); userPts.push({x:(e.clientX-r.left)/r.width*840, y:(e.clientY-r.top)/r.height*400}); drawBrach(); }});
+    window.addEventListener('mouseup', () => { 
+      if(brachIsDrawing){ 
+        brachIsDrawing=false; 
+        let raw = [...userPts, B_END], smooth = [raw[0]];
+        for(let i=2; i<raw.length-2; i++) smooth.push({ x: (raw[i-2].x+raw[i-1].x+raw[i].x+raw[i+1].x+raw[i+2].x)/5, y: (raw[i-2].y+raw[i-1].y+raw[i].y+raw[i+1].y+raw[i+2].y)/5 });
+        smooth.push(B_END); brachPath=smooth; brachPathData = prepPath(brachPath); resetBrachBalls(); drawBrach();
+      }
+    });
+
+    function resetBrachBalls() { bUserBall={s:0,v:0,t:0,done:false}; bCycBall={s:0,v:0,t:0,done:false}; }
+
+    function toggleBrach() {
+      if(!brachPathData) return; bPlaying = !bPlaying;
+      let btn = document.getElementById('btn-brach');
+      if(bPlaying) { btn.innerText = "일시정지"; loopBrach(); }
+      else { btn.innerText = "공 굴리기"; cancelAnimationFrame(brachAnim); resetBrachBalls(); drawBrach(); }
+    }
+
+    function loopBrach() {
+      if(!bPlaying) return; const G = 1000, dt = 0.016;
+      if(!bUserBall.done) { let p = getPtAtS(brachPathData, bUserBall.s); bUserBall.v += G * p.dy * dt; bUserBall.s += bUserBall.v * dt; bUserBall.t += dt; if(bUserBall.s >= brachPathData.totS) bUserBall.done = true; }
+      if(!bCycBall.done) { let p = getPtAtS(bCycData, bCycBall.s); bCycBall.v += G * p.dy * dt; bCycBall.s += bCycBall.v * dt; bCycBall.t += dt; if(bCycBall.s >= bCycData.totS) bCycBall.done = true; }
+      document.getElementById('time-user').innerText = bUserBall.t.toFixed(3) + 's'; document.getElementById('time-cycloid').innerText = bCycBall.t.toFixed(3) + 's';
+      drawBrach();
+      if(bUserBall.done && bCycBall.done) { bPlaying = false; trialCountBrach++; document.getElementById('trial-counter').innerText = `${3-trialCountBrach} trials left`; if(trialCountBrach>=3) setTimeout(()=>jumpToPage(3),1500); } else brachAnim = requestAnimationFrame(loopBrach);
+    }
+
+
+    // --- PAGE 3: TAUTOCHRONE ---
+    const c3 = document.getElementById('canvas-tauto'); ctx3 = c3.getContext('2d');
+    let tBalls = [], tPlaying = false, tAnim;
+    function buildBowlCyc() {
+      let pts = []; const R = 115, startX = 65, startY = 40;
+      for(let a=0; a<=Math.PI*2; a+=0.02) pts.push({ x: startX + R*(a - Math.sin(a)), y: startY + R*(1 - Math.cos(a)) });
+      return prepPath(pts);
+    }
+    const tCycData = buildBowlCyc(), tCenterS = tCycData.totS / 2, tBottomPt = getPtAtS(tCycData, tCenterS);
+
+    c3.addEventListener('mousedown', e => {
+      if(tPlaying) return;
+      let r = c3.getBoundingClientRect(), mx = (e.clientX-r.left)/r.width*840, closestS = 0, minDist = Infinity;
+      tCycData.pts.forEach(p => { let dx = Math.abs(p.x-mx); if(dx<minDist) { minDist=dx; closestS=p.s; } });
+      if(Math.abs(closestS-tCenterS)>30) {
+        const colors = ['#3b82f6', '#8b5cf6', '#ec4899', '#ef4444', '#f59e0b'];
+        tBalls.push({ s:closestS, v:0, done:false, color:colors[tBalls.length%colors.length] }); drawTauto();
+      }
+    });
+
+    function clearTautoBalls() { tBalls = []; tPlaying = false; cancelAnimationFrame(tAnim); drawTauto(); document.getElementById('btn-tauto').innerText="실험 시작"; }
+
+    function drawTauto() {
+      ctx3.clearRect(0,0,840,400);
+      ctx3.beginPath(); tCycData.pts.forEach((p,i) => i===0 ? ctx3.moveTo(p.x,p.y) : ctx3.lineTo(p.x,p.y)); ctx3.strokeStyle = isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'; ctx3.lineWidth = 6; ctx3.lineCap = 'round'; ctx3.stroke();
+      ctx3.beginPath(); ctx3.arc(tBottomPt.x, tBottomPt.y, 6, 0, Math.PI*2); ctx3.fillStyle= isDarkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)'; ctx3.fill();
+      tBalls.forEach(b => { let pt = b.done ? tBottomPt : getPtAtS(tCycData, b.s); ctx3.beginPath(); ctx3.arc(pt.x, pt.y, 14, 0, Math.PI*2); ctx3.fillStyle = b.color; ctx3.fill(); ctx3.strokeStyle = '#fff'; ctx3.lineWidth=2; ctx3.stroke(); });
+    }
+
+    function toggleTauto() { if(tBalls.length===0) return; if(tPlaying) { clearTautoBalls(); return; } tPlaying = true; document.getElementById('btn-tauto').innerText = "재설정"; loopTauto(); }
+
+    function loopTauto() {
+      if(!tPlaying) return; const G = 1500, dt = 0.016; let allDone = true;
+      tBalls.forEach(b => {
+        if(!b.done) {
+          let distFromCenter = b.s - tCenterS, accel = - (G / tCycData.totS) * distFromCenter * 2.8; 
+          b.v += accel * dt; b.s += b.v * dt;
+          if((distFromCenter>0 && b.s<=tCenterS) || (distFromCenter<0 && b.s>=tCenterS)) { b.s=tCenterS; b.done=true; } else allDone=false;
+        }
+      });
+      drawTauto();
+      if(allDone) { tPlaying=false; ctx3.beginPath(); ctx3.arc(tBottomPt.x, tBottomPt.y, 40, 0, Math.PI*2); ctx3.fillStyle = 'rgba(255, 255, 255, 0.8)'; ctx3.fill(); setTimeout(() => jumpToPage(4), 1500); } else tAnim = requestAnimationFrame(loopTauto);
+    }
+
+
+    // --- PAGE 4: SPIROGRAPH (Real-time Interactive Art) ---
+    const c4 = document.getElementById('canvas-spiro');
+    const ctx4 = c4.getContext('2d');
+    
+    // Sliders
+    const s_R = document.getElementById('spiro-R'), s_r = document.getElementById('spiro-r'), s_d = document.getElementById('spiro-d');
+    const v_R = document.getElementById('val-spiro-R'), v_r = document.getElementById('val-spiro-r'), v_d = document.getElementById('val-spiro-d');
+
+    // 리얼타임 변경 감지 및 즉시 반영
+    [s_R, s_r, s_d].forEach(s => s.addEventListener('input', () => {
+      drawSpiro();
+      // 수치 텍스트 실시간 업데이트
+      v_R.innerText = s_R.value; v_r.innerText = s_r.value; v_d.innerText = s_d.value;
+    }));
+
+    function resetSpiro() {
+      s_R.value = 150; s_r.value = 65; s_d.value = 85;
+      v_R.innerText = 150; v_r.innerText = 65; v_d.innerText = 85;
+      drawSpiro();
+    }
+
+    function drawSpiro() {
+      // 윈도우 크기에 맞춘 리사이징 보정
+      const rect = c4.parentNode.getBoundingClientRect();
+      c4.width = rect.width; c4.height = rect.height;
+      const cx = c4.width / 2, cy = c4.height / 2;
+      
+      ctx4.clearRect(0,0,c4.width, c4.height);
+      
+      const R = parseInt(s_R.value), r = parseInt(s_r.value), d = parseInt(s_d.value);
+      const mainCol = isDarkMode ? '#fff' : '#000';
+
+      // 1. 가이드 원 (Outer Circle R)
+      ctx4.beginPath(); ctx4.arc(cx, cy, R, 0, Math.PI*2);
+      ctx4.strokeStyle = isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)';
+      ctx4.lineWidth = 1; ctx4.stroke();
+
+      // 2. 실시간 수학 패턴 드로잉
+      const grad = ctx4.createLinearGradient(0, 0, c4.width, 0);
+      grad.addColorStop(0, '#3b82f6'); grad.addColorStop(0.5, '#8b5cf6'); grad.addColorStop(1, '#ec4899');
+      
+      ctx4.strokeStyle = grad;
+      ctx4.lineWidth = isDarkMode ? 1.8 : 1.2;
+      ctx4.lineJoin = 'round'; ctx4.lineCap = 'round';
+
+      ctx4.beginPath();
+      // 고해상도 패턴 생성을 위해 t를 매우 잘게 쪼갬
+      const maxT = 60 * Math.PI; 
+      const diffR = R - r;
+      const ratioR = diffR / r;
+
+      for (let t = 0; t <= maxT; t += 0.018) {
+        const x = cx + diffR * Math.cos(t) + d * Math.cos(ratioR * t);
+        const y = cy + diffR * Math.sin(t) - d * Math.sin(ratioR * t);
+
+        if (t === 0) ctx4.moveTo(x, y);
+        else ctx4.lineTo(x, y);
+        
+        // 패턴 최적화: 너무 멀리 나가면 끊기
+        if (Math.hypot(x-cx, y-cy) > R + d + 50) break;
+      }
+      
+      if(isDarkMode) {
+        ctx4.shadowBlur = 15; ctx4.shadowColor = 'rgba(139, 92, 246, 0.4)';
+      }
+      ctx4.stroke();
+      ctx4.shadowBlur = 0;
+    }
+    
+    // Initial Load
+    window.addEventListener('load', () => { drawSpiro(); drawTauto(); drawBrach(); drawGenesis(); });
+    window.addEventListener('resize', drawSpiro);
+  </script>
+</body>
+</html>

@@ -105,9 +105,10 @@
     </section>
 
     <section id="page-4" class="section-page section-next">
-      <div class="text-center mb-6 z-10 max-w-xl px-6">
+      <!-- 수정 포인트 1: 글자를 위로 올리고 무늬를 가리지 않도록 속성 조정 -->
+      <div class="absolute top-28 left-1/2 -translate-x-1/2 text-center z-10 w-full max-w-2xl px-6 pointer-events-none">
         <h2 class="text-4xl font-bold mb-2 tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400">Art of Math</h2>
-        <p class="text-sm text-gray-500 leading-relaxed">이것도 사이클로이드의 사촌이에요. 원이 <span class="text-white/80 font-medium">직선 위</span>를 구르면 사이클로이드가 되고, 원이 <span class="text-white/80 font-medium">다른 원의 안쪽</span>을 구르면 이런 무늬가 만들어져요.</p>
+        <p class="text-sm text-gray-500 leading-relaxed">이것도 사이클로이드의 사촌이에요. 원이 <span class="font-medium opacity-80 text-current">직선 위</span>를 구르면 사이클로이드가 되고, 원이 <span class="font-medium opacity-80 text-current">다른 원의 안쪽이나 바깥쪽</span>을 구르면 이런 무늬가 만들어져요.</p>
       </div>
       
       <div class="absolute inset-0 z-0 opacity-80">
@@ -115,6 +116,12 @@
       </div>
 
       <div class="glass-card fixed bottom-10 right-10 p-8 flex flex-col gap-6 z-20 w-[320px] shadow-2xl">
+        <!-- 수정 포인트 2: 에피/하이포사이클로이드 전환 UI 추가 -->
+        <div class="flex p-1 bg-black/10 dark:bg-white/10 rounded-lg border border-black/5 dark:border-white/5">
+          <button id="btn-hypo" onclick="setSpiroType('hypo')" class="flex-1 py-2 text-[10px] font-bold uppercase tracking-widest rounded bg-blue-500 text-white shadow-md transition-all">Inner (Hypo)</button>
+          <button id="btn-epi" onclick="setSpiroType('epi')" class="flex-1 py-2 text-[10px] font-bold uppercase tracking-widest rounded opacity-50 hover:opacity-100 transition-all">Outer (Epi)</button>
+        </div>
+
         <div class="space-y-4">
           <div class="flex items-center justify-between text-[10px] font-mono tracking-widest text-gray-400 uppercase">
             <span>Outer Radius (R)</span>
@@ -134,7 +141,7 @@
           </div>
           <input type="range" id="spiro-d" min="10" max="200" step="1" value="85" class="w-full">
         </div>
-        <button onclick="resetSpiro()" class="text-[10px] font-bold uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity">Reset Art</button>
+        <button onclick="resetSpiro()" class="text-[10px] font-bold uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity text-left">Reset Art</button>
       </div>
     </section>
 
@@ -384,15 +391,29 @@
     const s_R = document.getElementById('spiro-R'), s_r = document.getElementById('spiro-r'), s_d = document.getElementById('spiro-d');
     const v_R = document.getElementById('val-spiro-R'), v_r = document.getElementById('val-spiro-r'), v_d = document.getElementById('val-spiro-d');
 
-    // 슬라이더를 움직이면 새 값으로 애니메이션을 처음부터 다시 재생
     [s_R, s_r, s_d].forEach(s => s.addEventListener('input', () => {
       v_R.innerText = s_R.value; v_r.innerText = s_r.value; v_d.innerText = s_d.value;
       startSpiroAnim();
     }));
 
+    // 모드(에피/하이포) 상태 변수 및 설정 함수
+    let spiroType = 'hypo';
+    function setSpiroType(type) {
+      spiroType = type;
+      const bHypo = document.getElementById('btn-hypo');
+      const bEpi = document.getElementById('btn-epi');
+      const activeClass = "flex-1 py-2 text-[10px] font-bold uppercase tracking-widest rounded bg-blue-500 text-white shadow-md transition-all";
+      const inactiveClass = "flex-1 py-2 text-[10px] font-bold uppercase tracking-widest rounded opacity-50 hover:opacity-100 transition-all";
+
+      bHypo.className = type === 'hypo' ? activeClass : inactiveClass;
+      bEpi.className = type === 'epi' ? activeClass : inactiveClass;
+      startSpiroAnim();
+    }
+
     function resetSpiro() {
       s_R.value = 150; s_r.value = 65; s_d.value = 85;
       v_R.innerText = 150; v_r.innerText = 65; v_d.innerText = 85;
+      setSpiroType('hypo'); // 기본은 하이포사이클로이드로 복귀
       startSpiroAnim();
     }
 
@@ -400,12 +421,9 @@
     let spiroAnimId = null;
     let spiroT = 0;
     const spiroMaxT = 60 * Math.PI;
-    const spiroSpeed = 0.35; // 프레임당 진행량 (재생 속도)
+    const spiroSpeed = 0.35;
 
-    // revealT가 주어지면 그 지점까지만 그리고, 그 지점에서 구르는 원(작은 원 + 팔)을 함께 그려서
-    // "원이 굴러가며 그린다"는 원리를 시각적으로 보여준다. revealT가 없으면 전체 패턴을 정적으로 그린다.
     function drawSpiroFrame(revealT) {
-      // 윈도우 크기에 맞춘 리사이징 보정
       const rect = c4.parentNode.getBoundingClientRect();
       c4.width = rect.width; c4.height = rect.height;
       const cx = c4.width / 2, cy = c4.height / 2;
@@ -413,8 +431,11 @@
       ctx4.clearRect(0, 0, c4.width, c4.height);
 
       const R = parseInt(s_R.value), r = parseInt(s_r.value), d = parseInt(s_d.value);
-      const diffR = R - r;
-      const ratioR = diffR / r;
+      const isEpi = spiroType === 'epi';
+      
+      // 수학적 계산: 하이포사이클로이드는 R-r, 에피사이클로이드는 R+r
+      const distR = isEpi ? (R + r) : (R - r);
+      const ratioR = distR / r;
       const tEnd = revealT !== undefined ? Math.min(revealT, spiroMaxT) : spiroMaxT;
 
       // 1. 가이드 원 (Outer Circle R)
@@ -422,7 +443,7 @@
       ctx4.strokeStyle = isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)';
       ctx4.lineWidth = 1; ctx4.stroke();
 
-      // 2. 수학 패턴 드로잉 (지금까지 그려진 부분까지만)
+      // 2. 수학 패턴 드로잉
       const grad = ctx4.createLinearGradient(0, 0, c4.width, 0);
       grad.addColorStop(0, '#3b82f6'); grad.addColorStop(0.5, '#8b5cf6'); grad.addColorStop(1, '#ec4899');
       
@@ -433,15 +454,17 @@
       ctx4.beginPath();
       let started = false, lastX, lastY;
       for (let t = 0; t <= tEnd; t += 0.018) {
-        const x = cx + diffR * Math.cos(t) + d * Math.cos(ratioR * t);
-        const y = cy + diffR * Math.sin(t) - d * Math.sin(ratioR * t);
+        // 부호 변화에 따라 에피(바깥쪽) / 하이포(안쪽) 궤적이 나뉨
+        const signX = isEpi ? -1 : 1;
+        const x = cx + distR * Math.cos(t) + signX * d * Math.cos(ratioR * t);
+        const y = cy + distR * Math.sin(t) - d * Math.sin(ratioR * t);
 
         if (!started) { ctx4.moveTo(x, y); started = true; }
         else ctx4.lineTo(x, y);
         lastX = x; lastY = y;
 
-        // 패턴 최적화: 너무 멀리 나가면 끊기
-        if (Math.hypot(x-cx, y-cy) > R + d + 50) break;
+        // 패턴 최적화: 너무 멀리 나가면 끊기 (에피사이클로이드 폭주 방지)
+        if (Math.hypot(x-cx, y-cy) > 2000) break;
       }
       
       if(isDarkMode) {
@@ -450,9 +473,9 @@
       ctx4.stroke();
       ctx4.shadowBlur = 0;
 
-      // 3. 구르는 원 + 펜 포인트 (애니메이션 중일 때만) — "원이 굴러서 무늬를 그린다"는 원리를 보여줌
+      // 3. 구르는 원 + 펜 포인트 (애니메이션 중일 때만 시각화)
       if (revealT !== undefined && lastX !== undefined) {
-        const rcx = cx + diffR * Math.cos(tEnd), rcy = cy + diffR * Math.sin(tEnd);
+        const rcx = cx + distR * Math.cos(tEnd), rcy = cy + distR * Math.sin(tEnd);
         ctx4.beginPath(); ctx4.arc(rcx, rcy, r, 0, Math.PI*2);
         ctx4.strokeStyle = isDarkMode ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.25)';
         ctx4.lineWidth = 1.5; ctx4.stroke();
@@ -469,7 +492,7 @@
 
     function animateSpiro() {
       spiroT += spiroSpeed;
-      if (spiroT > spiroMaxT) spiroT = 0; // 끝까지 그리면 처음부터 다시 시작 (루프)
+      if (spiroT > spiroMaxT) spiroT = 0; 
       drawSpiroFrame(spiroT);
       spiroAnimId = requestAnimationFrame(animateSpiro);
     }
@@ -485,7 +508,6 @@
       spiroAnimId = null;
     }
 
-    // 테마 전환/리사이즈 등 기존 코드와의 호환을 위해 이름 유지
     function drawSpiro() {
       drawSpiroFrame(spiroAnimId ? spiroT : undefined);
     }

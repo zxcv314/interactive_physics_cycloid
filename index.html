@@ -64,7 +64,7 @@
       <div class="glass-card relative w-full max-w-[840px] aspect-[840/420] overflow-hidden" id="genesis-container">
         <canvas id="canvas-genesis" width="840" height="420" class="block w-full h-full"></canvas>
       </div>
-      <p class="mt-8 text-[11px] font-mono opacity-30 animate-pulse">SCROLL TO ROTATE</p> section-active
+      <p class="mt-8 text-[11px] font-mono opacity-30 animate-pulse">SCROLL TO ROTATE</p>
     </section>
 
     <section id="page-2" class="section-page section-next">
@@ -105,9 +105,9 @@
     </section>
 
     <section id="page-4" class="section-page section-next">
-      <div class="text-center mb-6 z-10">
+      <div class="text-center mb-6 z-10 max-w-xl px-6">
         <h2 class="text-4xl font-bold mb-2 tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400">Art of Math</h2>
-        <p class="text-sm text-gray-500">변수 조절을 통해 실시간으로 변하는 곡선을 감상하세요.</p>
+        <p class="text-sm text-gray-500 leading-relaxed">이것도 사이클로이드의 사촌이에요. 원이 <span class="text-white/80 font-medium">직선 위</span>를 구르면 사이클로이드가 되고, 원이 <span class="text-white/80 font-medium">다른 원의 안쪽</span>을 구르면 이런 무늬가 만들어져요.</p>
       </div>
       
       <div class="absolute inset-0 z-0 opacity-80">
@@ -384,36 +384,45 @@
     const s_R = document.getElementById('spiro-R'), s_r = document.getElementById('spiro-r'), s_d = document.getElementById('spiro-d');
     const v_R = document.getElementById('val-spiro-R'), v_r = document.getElementById('val-spiro-r'), v_d = document.getElementById('val-spiro-d');
 
-    // 리얼타임 변경 감지 및 즉시 반영
+    // 슬라이더를 움직이면 새 값으로 애니메이션을 처음부터 다시 재생
     [s_R, s_r, s_d].forEach(s => s.addEventListener('input', () => {
-      drawSpiro();
-      // 수치 텍스트 실시간 업데이트
       v_R.innerText = s_R.value; v_r.innerText = s_r.value; v_d.innerText = s_d.value;
+      startSpiroAnim();
     }));
 
     function resetSpiro() {
       s_R.value = 150; s_r.value = 65; s_d.value = 85;
       v_R.innerText = 150; v_r.innerText = 65; v_d.innerText = 85;
-      drawSpiro();
+      startSpiroAnim();
     }
 
-    function drawSpiro() {
+    // --- 애니메이션 상태 ---
+    let spiroAnimId = null;
+    let spiroT = 0;
+    const spiroMaxT = 60 * Math.PI;
+    const spiroSpeed = 0.35; // 프레임당 진행량 (재생 속도)
+
+    // revealT가 주어지면 그 지점까지만 그리고, 그 지점에서 구르는 원(작은 원 + 팔)을 함께 그려서
+    // "원이 굴러가며 그린다"는 원리를 시각적으로 보여준다. revealT가 없으면 전체 패턴을 정적으로 그린다.
+    function drawSpiroFrame(revealT) {
       // 윈도우 크기에 맞춘 리사이징 보정
       const rect = c4.parentNode.getBoundingClientRect();
       c4.width = rect.width; c4.height = rect.height;
       const cx = c4.width / 2, cy = c4.height / 2;
-      
-      ctx4.clearRect(0,0,c4.width, c4.height);
-      
+
+      ctx4.clearRect(0, 0, c4.width, c4.height);
+
       const R = parseInt(s_R.value), r = parseInt(s_r.value), d = parseInt(s_d.value);
-      const mainCol = isDarkMode ? '#fff' : '#000';
+      const diffR = R - r;
+      const ratioR = diffR / r;
+      const tEnd = revealT !== undefined ? Math.min(revealT, spiroMaxT) : spiroMaxT;
 
       // 1. 가이드 원 (Outer Circle R)
       ctx4.beginPath(); ctx4.arc(cx, cy, R, 0, Math.PI*2);
       ctx4.strokeStyle = isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)';
       ctx4.lineWidth = 1; ctx4.stroke();
 
-      // 2. 실시간 수학 패턴 드로잉
+      // 2. 수학 패턴 드로잉 (지금까지 그려진 부분까지만)
       const grad = ctx4.createLinearGradient(0, 0, c4.width, 0);
       grad.addColorStop(0, '#3b82f6'); grad.addColorStop(0.5, '#8b5cf6'); grad.addColorStop(1, '#ec4899');
       
@@ -422,18 +431,15 @@
       ctx4.lineJoin = 'round'; ctx4.lineCap = 'round';
 
       ctx4.beginPath();
-      // 고해상도 패턴 생성을 위해 t를 매우 잘게 쪼갬
-      const maxT = 60 * Math.PI; 
-      const diffR = R - r;
-      const ratioR = diffR / r;
-
-      for (let t = 0; t <= maxT; t += 0.018) {
+      let started = false, lastX, lastY;
+      for (let t = 0; t <= tEnd; t += 0.018) {
         const x = cx + diffR * Math.cos(t) + d * Math.cos(ratioR * t);
         const y = cy + diffR * Math.sin(t) - d * Math.sin(ratioR * t);
 
-        if (t === 0) ctx4.moveTo(x, y);
+        if (!started) { ctx4.moveTo(x, y); started = true; }
         else ctx4.lineTo(x, y);
-        
+        lastX = x; lastY = y;
+
         // 패턴 최적화: 너무 멀리 나가면 끊기
         if (Math.hypot(x-cx, y-cy) > R + d + 50) break;
       }
@@ -443,10 +449,49 @@
       }
       ctx4.stroke();
       ctx4.shadowBlur = 0;
+
+      // 3. 구르는 원 + 펜 포인트 (애니메이션 중일 때만) — "원이 굴러서 무늬를 그린다"는 원리를 보여줌
+      if (revealT !== undefined && lastX !== undefined) {
+        const rcx = cx + diffR * Math.cos(tEnd), rcy = cy + diffR * Math.sin(tEnd);
+        ctx4.beginPath(); ctx4.arc(rcx, rcy, r, 0, Math.PI*2);
+        ctx4.strokeStyle = isDarkMode ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.25)';
+        ctx4.lineWidth = 1.5; ctx4.stroke();
+
+        ctx4.beginPath(); ctx4.moveTo(rcx, rcy); ctx4.lineTo(lastX, lastY);
+        ctx4.strokeStyle = isDarkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.35)';
+        ctx4.lineWidth = 1.5; ctx4.stroke();
+
+        ctx4.beginPath(); ctx4.arc(lastX, lastY, 6, 0, Math.PI*2);
+        ctx4.fillStyle = '#fff'; ctx4.fill();
+        ctx4.strokeStyle = '#ec4899'; ctx4.lineWidth = 2; ctx4.stroke();
+      }
+    }
+
+    function animateSpiro() {
+      spiroT += spiroSpeed;
+      if (spiroT > spiroMaxT) spiroT = 0; // 끝까지 그리면 처음부터 다시 시작 (루프)
+      drawSpiroFrame(spiroT);
+      spiroAnimId = requestAnimationFrame(animateSpiro);
+    }
+
+    function startSpiroAnim() {
+      cancelAnimationFrame(spiroAnimId);
+      spiroT = 0;
+      animateSpiro();
+    }
+
+    function stopSpiroAnim() {
+      cancelAnimationFrame(spiroAnimId);
+      spiroAnimId = null;
+    }
+
+    // 테마 전환/리사이즈 등 기존 코드와의 호환을 위해 이름 유지
+    function drawSpiro() {
+      drawSpiroFrame(spiroAnimId ? spiroT : undefined);
     }
     
     // Initial Load
-    window.addEventListener('load', () => { drawSpiro(); drawTauto(); drawBrach(); drawGenesis(); });
+    window.addEventListener('load', () => { drawTauto(); drawBrach(); drawGenesis(); });
     window.addEventListener('resize', drawSpiro);
   </script>
 </body>
